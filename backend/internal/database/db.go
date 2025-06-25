@@ -10,9 +10,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var DB *pgxpool.Pool
-
-func ConnectDB() {
+func ConnectDB() *pgxpool.Pool {
 	err := godotenv.Load()
 
 	if err != nil {
@@ -36,5 +34,5 @@ func ConnectDB() {
 	}
 
 	fmt.Println("✅ Connected to Neon Postgres!")
-	DB = pool
+	return pool
 }

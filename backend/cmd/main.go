@@ -8,9 +8,9 @@ import (
 )
 
 func main() {
-	database.ConnectDB()
-	database.RunMigrations()
-	app := app.Init()
+	db := database.ConnectDB()
+	database.RunMigrations(db)
+	app := app.Init(db)
 
 	log.Fatal(app.Listen(":3000"))
 }

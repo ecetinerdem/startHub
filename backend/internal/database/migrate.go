@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func RunMigrations() {
+func RunMigrations(db *pgxpool.Pool) {
 	fmt.Println("📄 Running database migrations...")
 
 	content, err := os.ReadFile("sql/schema.sql")
@@ -15,7 +17,7 @@ func RunMigrations() {
 		panic("Failed to read migration file from sql: " + err.Error())
 	}
 
-	_, err = DB.Exec(context.Background(), string(content))
+	_, err = db.Exec(context.Background(), string(content))
 
 	if err != nil {
 		panic("Failed to read migration file from sql: " + err.Error())
