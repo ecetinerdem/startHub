@@ -112,6 +112,60 @@ func GetStartHubByID(db *pgxpool.Pool) fiber.Handler {
 	}
 }
 
+func GetStartHubsBySearchTerm(db *pgxpool.Pool) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		searchTerm := c.Query("name")
+
+		if searchTerm == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Search term 'name' is required.",
+			})
+		}
+
+		query := "SELECT id, name, description, location, team_size, url, email, join_date FROM starthubs WHERE name ILIKE $1"
+		searchPattern := "%" + searchTerm + "%"
+
+		rows, err := db.Query(context.Background(), query, searchPattern)
+		if err != nil {
+			log.Printf("❌ Database error for search '%s': %v", searchTerm, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Could not search starthubs",
+			})
+		}
+		defer rows.Close()
+
+		var starthubs []models.StartHub
+
+		for rows.Next() {
+			var s models.StartHub
+			err := rows.Scan(
+				&s.ID,
+				&s.Name,
+				&s.Description,
+				&s.Location,
+				&s.TeamSize,
+				&s.URL,
+				&s.Email,
+				&s.JoinDate,
+			)
+			if err != nil {
+				log.Printf("❌ Row scan error: %v", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Could not process results",
+				})
+			}
+			starthubs = append(starthubs, s)
+		}
+
+		// Always return 200 with consistent structure
+		return c.JSON(fiber.Map{
+			"search_term": searchTerm,
+			"found":       len(starthubs),
+			"results":     starthubs, // Empty array if no results
+		})
+	}
+}
+
 // CreateStartHub - Creates a new starthub
 func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
