@@ -69,3 +69,27 @@ func GetAllStarthubs(db *pgxpool.Pool) fiber.Handler {
 		return c.JSON(starthubs)
 	}
 }
+
+func CreateStartHub(dv *pgxpool.Pool) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		var s models.StartHub
+
+		if err := c.BodyParser(&s); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid request body",
+			})
+		}
+		categoryJSON, _ := json.Marshal(s.Category)
+		colStarthubsJSON, _ := json.Marshal([]string{})
+		colCompaniesJSON, _ := json.Marshal([]string{})
+		investorsJSON, _ := json.Marshal([]string{})
+		donatorsJSON, _ := json.Marshal([]string{})
+
+		query := `
+		INSERT INTO starthubs
+		(
+		name, category, description, location, team_size, url, email, collaborating_starthubs, collaborating_companies, investors, donators, join_date
+		)
+		`
+	}
+}

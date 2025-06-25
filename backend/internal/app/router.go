@@ -9,4 +9,5 @@ import (
 func setupRoutes(app *fiber.App, db *pgxpool.Pool) {
 
 	app.Get("/starthubs", routes.GetAllStarthubs(db))
+	app.Post("/starthubs", routes.CreateStartHub(db))
 }
