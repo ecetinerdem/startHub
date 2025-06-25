@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS starthub_categories (
     PRIMARY KEY (starthub_id, category_id)
 );
 
+
+
+
 -- Self-referencing many-to-many: Starthub collaborations
 CREATE TABLE IF NOT EXISTS starthub_collaborations (
     starthub_id UUID REFERENCES starthubs(id) ON DELETE CASCADE,
@@ -48,3 +51,5 @@ CREATE TABLE IF NOT EXISTS external_collaborators (
     starthub_id UUID REFERENCES starthubs(id) ON DELETE CASCADE,
     name TEXT NOT NULL
 );
+
+
