@@ -70,7 +70,7 @@ func GetAllStarthubs(db *pgxpool.Pool) fiber.Handler {
 	}
 }
 
-func CreateStartHub(dv *pgxpool.Pool) fiber.Handler {
+func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var s models.StartHub
 
@@ -86,10 +86,35 @@ func CreateStartHub(dv *pgxpool.Pool) fiber.Handler {
 		donatorsJSON, _ := json.Marshal([]string{})
 
 		query := `
-		INSERT INTO starthubs
-		(
-		name, category, description, location, team_size, url, email, collaborating_starthubs, collaborating_companies, investors, donators, join_date
-		)
+		INSERT INTO starthubs 
+		(name, category, description, location, team_size, url, email, collaborating_starthubs, collaborating_companies, investors, donators, join_date)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING id
 		`
+
+		err := db.QueryRow(
+			context.Background(),
+			query,
+			s.Name,
+			categoryJSON,
+			s.Description,
+			s.Location,
+			s.TeamSize,
+			s.URL,
+			s.Email,
+			colStarthubsJSON,
+			colCompaniesJSON,
+			investorsJSON,
+			donatorsJSON,
+			s.JoinDate,
+		).Scan(&s.ID)
+
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to create starthub",
+			})
+		}
+		return c.Status(fiber.StatusCreated).JSON(s)
 	}
+
 }
