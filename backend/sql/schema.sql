@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Users table for role-based access
-CREATE TABLE IF NOT EXIST users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
@@ -11,13 +11,13 @@ CREATE TABLE IF NOT EXIST users (
 );
 
 -- Categories table
-CREATE TABLE IF NOT EXIST categories (
+CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
     name TEXT UNIQUE NOT NULL
 );
 
 -- Starthubs table
-CREATE TABLE IF NOT EXIST starthubs (
+CREATE TABLE IF NOT EXISTS starthubs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT,
@@ -29,21 +29,21 @@ CREATE TABLE IF NOT EXIST starthubs (
 );
 
 -- Many-to-many: Starthub <-> Category
-CREATE TABLE IF NOT EXIST starthub_categories (
+CREATE TABLE IF NOT EXISTS starthub_categories (
     starthub_id UUID REFERENCES starthubs(id) ON DELETE CASCADE,
     category_id INT REFERENCES categories(id) ON DELETE CASCADE,
     PRIMARY KEY (starthub_id, category_id)
 );
 
 -- Self-referencing many-to-many: Starthub collaborations
-CREATE TABLE IF NOT EXIST starthub_collaborations (
+CREATE TABLE IF NOT EXISTS starthub_collaborations (
     starthub_id UUID REFERENCES starthubs(id) ON DELETE CASCADE,
     collaborator_id UUID REFERENCES starthubs(id) ON DELETE CASCADE,
     PRIMARY KEY (starthub_id, collaborator_id)
 );
 
 -- External collaborators not in starthubs
-CREATE TABLE IF NOT EXIST external_collaborators (
+CREATE TABLE IF NOT EXISTS external_collaborators (
     id SERIAL PRIMARY KEY,
     starthub_id UUID REFERENCES starthubs(id) ON DELETE CASCADE,
     name TEXT NOT NULL

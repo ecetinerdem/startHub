@@ -9,6 +9,7 @@ import (
 
 func main() {
 	database.ConnectDB()
+	database.RunMigrations()
 	app := app.Init()
 
 	log.Fatal(app.Listen(":3000"))
