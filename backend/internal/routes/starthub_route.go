@@ -59,6 +59,59 @@ func GetAllStarthubs(db *pgxpool.Pool) fiber.Handler {
 	}
 }
 
+// GetStartHubByID - Gets one starthub with ID
+func GetStartHubByID(db *pgxpool.Pool) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+
+		// Get the ID from context parameters
+		id := c.Params("id")
+
+		// Basic ID check
+		if id == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "ID is required",
+			})
+		}
+
+		// SQL query for getting one starthub based on ID
+		query := "SELECT id, name, description, location, team_size, url, email, join_date FROM starthubs WHERE id = $1"
+
+		// Initilize a starthub model to variable
+		var s models.StartHub
+
+		// Context not sure what it is but basically satisfies the context that is queried, takes the query and id
+		//Queried info scanned in to s model
+		err := db.QueryRow(context.Background(), query, id).Scan(
+			&s.ID,
+			&s.Name,
+			&s.Description,
+			&s.Location,
+			&s.TeamSize,
+			&s.URL,
+			&s.Email,
+			&s.JoinDate,
+		)
+
+		// if error id is causing error and if no result then id not there
+		if err != nil {
+			log.Printf("❌ Database error for ID %s: %v", id, err)
+
+			if err.Error() == "no rows in result set" {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "Starthub not found",
+				})
+			}
+
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Could not get starthub from database",
+			})
+		}
+
+		// all is good then fiber context named c turns s model into json
+		return c.JSON(s)
+	}
+}
+
 // CreateStartHub - Creates a new starthub
 func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
