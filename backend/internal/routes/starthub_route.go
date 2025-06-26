@@ -2,20 +2,96 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"os"
+	"strings"
 
 	"github.com/ecetinerdem/starthub-backend/internal/models"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// GetAllStarthubs - Gets all starthubs from database
+// getImageFromPexels fetches an image URL from Pexels based on category
+func getImageFromPexels(category string) string {
+	// Get API key from environment
+	apiKey := os.Getenv("PEXELS_API_KEY")
+	if apiKey == "" {
+		log.Printf("⚠️  PEXELS_API_KEY not found in environment")
+		return "" // Return empty string if no API key
+	}
+
+	// Clean up the category for search (remove spaces, make lowercase)
+	searchTerm := strings.ToLower(strings.TrimSpace(category))
+	if searchTerm == "" {
+		searchTerm = "startup" // Default fallback
+	}
+
+	// Build the API URL
+	url := fmt.Sprintf("https://api.pexels.com/v1/search?query=%s&per_page=1", searchTerm)
+
+	// Create the request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("❌ Could not create Pexels request: %v", err)
+		return ""
+	}
+
+	// Add the authorization header
+	req.Header.Add("Authorization", apiKey)
+
+	// Make the request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("❌ Pexels API request failed: %v", err)
+		return ""
+	}
+	defer resp.Body.Close()
+
+	// Check if request was successful
+	if resp.StatusCode != 200 {
+		log.Printf("❌ Pexels API returned status %d", resp.StatusCode)
+		return ""
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("❌ Could not read Pexels response: %v", err)
+		return ""
+	}
+
+	// Parse the JSON response
+	var pexelsResp models.PexelsResponse
+	err = json.Unmarshal(body, &pexelsResp)
+	if err != nil {
+		log.Printf("❌ Could not parse Pexels response: %v", err)
+		return ""
+	}
+
+	// Check if we got any photos
+	if len(pexelsResp.Photos) == 0 {
+		log.Printf("⚠️  No photos found for category: %s", category)
+		return ""
+	}
+
+	// Return the medium image URL
+	imageURL := pexelsResp.Photos[0].Src.Medium
+	log.Printf("✅ Got image from Pexels for '%s': %s", category, imageURL)
+	return imageURL
+}
+
+// GetAllStarthubs - Gets all starthubs from database with images
 func GetAllStarthubs(db *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Step 1: Write a simple SQL query that matches your database
-		query := "SELECT id, name, description, location, team_size, url, email, join_date FROM starthubs"
+		// Updated query to include image_url
+		query := "SELECT id, name, description, location, team_size, url, email, join_date, image_url FROM starthubs"
 
-		// Step 2: Execute the query
+		// Execute the query
 		rows, err := db.Query(context.Background(), query)
 		if err != nil {
 			log.Printf("❌ Database error: %v", err)
@@ -23,12 +99,12 @@ func GetAllStarthubs(db *pgxpool.Pool) fiber.Handler {
 				"error": "Could not get starthubs from database",
 			})
 		}
-		defer rows.Close() // Always close rows when done
+		defer rows.Close()
 
-		// Step 3: Create a slice to hold our results
+		// Create a slice to hold our results
 		var starthubs []models.StartHub
 
-		// Step 4: Loop through each row and scan the data
+		// Loop through each row and scan the data
 		for rows.Next() {
 			var s models.StartHub
 
@@ -41,6 +117,7 @@ func GetAllStarthubs(db *pgxpool.Pool) fiber.Handler {
 				&s.URL,
 				&s.Email,
 				&s.JoinDate,
+				&s.ImageURL, // Added image_url field
 			)
 
 			if err != nil {
@@ -54,15 +131,14 @@ func GetAllStarthubs(db *pgxpool.Pool) fiber.Handler {
 			starthubs = append(starthubs, s)
 		}
 
-		// Step 5: Return the results as JSON
+		// Return the results as JSON
 		return c.JSON(starthubs)
 	}
 }
 
-// GetStartHubByID - Gets one starthub with ID
+// GetStartHubByID - Gets one starthub with ID including image
 func GetStartHubByID(db *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-
 		// Get the ID from context parameters
 		id := c.Params("id")
 
@@ -73,14 +149,13 @@ func GetStartHubByID(db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		// SQL query for getting one starthub based on ID
-		query := "SELECT id, name, description, location, team_size, url, email, join_date FROM starthubs WHERE id = $1"
+		// Updated SQL query to include image_url
+		query := "SELECT id, name, description, location, team_size, url, email, join_date, image_url FROM starthubs WHERE id = $1"
 
-		// Initilize a starthub model to variable
+		// Initialize a starthub model to variable
 		var s models.StartHub
 
-		// Context not sure what it is but basically satisfies the context that is queried, takes the query and id
-		//Queried info scanned in to s model
+		// Execute query and scan results
 		err := db.QueryRow(context.Background(), query, id).Scan(
 			&s.ID,
 			&s.Name,
@@ -90,9 +165,10 @@ func GetStartHubByID(db *pgxpool.Pool) fiber.Handler {
 			&s.URL,
 			&s.Email,
 			&s.JoinDate,
+			&s.ImageURL, // Added image_url field
 		)
 
-		// if error id is causing error and if no result then id not there
+		// Handle errors
 		if err != nil {
 			log.Printf("❌ Database error for ID %s: %v", id, err)
 
@@ -107,7 +183,7 @@ func GetStartHubByID(db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		// all is good then fiber context named c turns s model into json
+		// Return the result as JSON
 		return c.JSON(s)
 	}
 }
@@ -122,7 +198,8 @@ func GetStartHubsBySearchTerm(db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		query := "SELECT id, name, description, location, team_size, url, email, join_date FROM starthubs WHERE name ILIKE $1"
+		// Updated query to include image_url
+		query := "SELECT id, name, description, location, team_size, url, email, join_date, image_url FROM starthubs WHERE name ILIKE $1"
 		searchPattern := "%" + searchTerm + "%"
 
 		rows, err := db.Query(context.Background(), query, searchPattern)
@@ -147,6 +224,7 @@ func GetStartHubsBySearchTerm(db *pgxpool.Pool) fiber.Handler {
 				&s.URL,
 				&s.Email,
 				&s.JoinDate,
+				&s.ImageURL, // Added image_url field
 			)
 			if err != nil {
 				log.Printf("❌ Row scan error: %v", err)
@@ -161,7 +239,7 @@ func GetStartHubsBySearchTerm(db *pgxpool.Pool) fiber.Handler {
 		return c.JSON(fiber.Map{
 			"search_term": searchTerm,
 			"found":       len(starthubs),
-			"results":     starthubs, // Empty array if no results
+			"results":     starthubs,
 		})
 	}
 }
@@ -191,7 +269,17 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		// Step 4: Start a transaction for multiple table operations
+		// Step 4: Get image from Pexels if categories are provided
+		var imageURL string
+		if len(req.Categories) > 0 && req.Categories[0] != "" {
+			imageURL = getImageFromPexels(req.Categories[0])
+		}
+		// If no image found or no categories, use a default search
+		if imageURL == "" {
+			imageURL = getImageFromPexels("startup")
+		}
+
+		// Step 5: Start a transaction for multiple table operations
 		tx, err := db.Begin(context.Background())
 		if err != nil {
 			log.Printf("❌ Could not start transaction: %v", err)
@@ -201,11 +289,11 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 		}
 		defer tx.Rollback(context.Background()) // Rollback if we don't commit
 
-		// Step 5: Insert the starthub first
+		// Step 6: Insert the starthub first (now including image_url)
 		var s models.StartHub
 		query := `
-		INSERT INTO starthubs (name, description, location, team_size, url, email)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO starthubs (name, description, location, team_size, url, email, image_url)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, join_date
 		`
 
@@ -218,6 +306,7 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 			req.TeamSize,
 			req.URL,
 			req.Email,
+			imageURL, // Added image_url parameter
 		).Scan(&s.ID, &s.JoinDate)
 
 		if err != nil {
@@ -234,8 +323,9 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 		s.TeamSize = req.TeamSize
 		s.URL = req.URL
 		s.Email = req.Email
+		s.ImageURL = imageURL // Include the image URL in response
 
-		// Step 6: Handle categories if provided
+		// Step 7: Handle categories if provided (same as before)
 		if len(req.Categories) > 0 {
 			for _, categoryName := range req.Categories {
 				if categoryName == "" {
@@ -279,7 +369,7 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 			s.Categories = req.Categories
 		}
 
-		// Step 7: Commit the transaction
+		// Step 8: Commit the transaction
 		err = tx.Commit(context.Background())
 		if err != nil {
 			log.Printf("❌ Could not commit transaction: %v", err)
@@ -288,7 +378,7 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		// Step 8: Return the created starthub with categories
+		// Step 9: Return the created starthub with categories and image
 		return c.Status(fiber.StatusCreated).JSON(s)
 	}
 }

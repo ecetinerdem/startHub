@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS categories (
     name TEXT UNIQUE NOT NULL
 );
 
--- Starthubs table
+-- Starthubs table (now with image_url field)
 CREATE TABLE IF NOT EXISTS starthubs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS starthubs (
     team_size INT,
     url TEXT,
     email TEXT UNIQUE NOT NULL,
+    image_url TEXT,
     join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -34,9 +35,6 @@ CREATE TABLE IF NOT EXISTS starthub_categories (
     category_id INT REFERENCES categories(id) ON DELETE CASCADE,
     PRIMARY KEY (starthub_id, category_id)
 );
-
-
-
 
 -- Self-referencing many-to-many: Starthub collaborations
 CREATE TABLE IF NOT EXISTS starthub_collaborations (

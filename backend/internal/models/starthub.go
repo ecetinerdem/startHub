@@ -11,6 +11,7 @@ type StartHub struct {
 	URL                    string    `json:"url"`
 	Email                  string    `json:"email"`
 	JoinDate               time.Time `json:"join_date"`
+	ImageURL               string    `json:"image_url,omitempty"`
 	Categories             []string  `json:"categories,omitempty"`
 	CollaboratingStarthubs []string  `json:"collaborating_starthubs,omitempty"`
 	ExternalCollaborators  []string  `json:"external_collaborators,omitempty"`
@@ -25,4 +26,17 @@ type CreateStartHubRequest struct {
 	URL         string   `json:"url"`
 	Email       string   `json:"email" validate:"required,email"`
 	Categories  []string `json:"categories"`
+}
+
+// PexelsResponse represents the response from Pexels API
+type PexelsResponse struct {
+	Photos []PexelsPhoto `json:"photos"`
+}
+
+type PexelsPhoto struct {
+	Src PexelsSrc `json:"src"`
+}
+
+type PexelsSrc struct {
+	Medium string `json:"medium"`
 }
