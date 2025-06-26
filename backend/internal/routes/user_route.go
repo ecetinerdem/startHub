@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/ecetinerdem/starthub-backend/internal/models"
+	"github.com/ecetinerdem/starthub-backend/pkg/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
@@ -49,12 +50,24 @@ func RegisterUser(db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		return c.Status(fiber.StatusCreated).JSON(models.UserResponse{
-			ID:        user.ID,
-			Email:     user.Email,
-			Role:      user.Role,
-			CreatedAt: user.CreatedAt,
-		})
+		//Generate JWT here
 
+		token, err := utils.GenerateJWT(user)
+		if err != nil {
+			log.Printf("❌ Could not generate JWT: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "User created but could not generate authentication token",
+			})
+		}
+
+		return c.Status(fiber.StatusCreated).JSON(models.AuthResponse{
+			User: models.UserResponse{
+				ID:        user.ID,
+				Email:     user.Email,
+				Role:      user.Role,
+				CreatedAt: user.CreatedAt,
+			},
+			Token: token,
+		})
 	}
 }
