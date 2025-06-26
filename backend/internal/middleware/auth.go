@@ -11,7 +11,7 @@ func RequireAuth(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 
 	if authHeader == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fibe.Map{
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "Authorization header required",
 		})
 	}

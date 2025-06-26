@@ -8,13 +8,21 @@ import (
 )
 
 func setupRoutes(app *fiber.App, db *pgxpool.Pool) {
-	// User
+	// Auth routes (public)
 	app.Post("/sign-up", middleware.ValidateRegister, routes.RegisterUser(db))
+	app.Post("/sign-in", middleware.ValidateLogin, routes.LoginUser(db))
 
-	// Starthubs
+	// Protected routes - require authentication
+	api := app.Group("/api", middleware.RequireAuth)
+
+	// Starthubs (protected)
+	api.Post("/starthubs", routes.CreateStartHub(db))
+	// Add other protected routes here as needed
+	// api.Put("/starthubs/:id", routes.UpdateStartHub(db))
+	// api.Delete("/starthubs/:id", routes.DeleteStartHub(db))
+
+	// Public starthub routes (no auth required)
 	app.Get("/starthubs", routes.GetAllStarthubs(db))
 	app.Get("/starthubs/search", routes.GetStartHubsBySearchTerm(db))
-	// This route LAST in its group because matches everything then
-	app.Get("/starthubs/:id", routes.GetStartHubByID(db)) // Keep as last route
-	app.Post("/starthubs", routes.CreateStartHub(db))
+	app.Get("/starthubs/:id", routes.GetStartHubByID(db))
 }
