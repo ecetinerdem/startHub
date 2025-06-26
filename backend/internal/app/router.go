@@ -17,8 +17,8 @@ func setupRoutes(app *fiber.App, db *pgxpool.Pool) {
 
 	// Starthubs (protected)
 	api.Post("/starthubs", routes.CreateStartHub(db))
-	//api.Put("/starthubs/:id", routes.UpdateStartHub(db))
-	//api.Delete("/starthubs/:id", routes.DeleteStartHub(db))
+	api.Put("/starthubs/:id", routes.UpdateStartHub(db))
+	api.Delete("/starthubs/:id", routes.DeleteStartHub(db))
 	// Add other protected routes here as needed
 	// api.Put("/starthubs/:id", routes.UpdateStartHub(db))
 	// api.Delete("/starthubs/:id", routes.DeleteStartHub(db))
