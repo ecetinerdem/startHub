@@ -166,14 +166,13 @@ func GetStartHubsBySearchTerm(db *pgxpool.Pool) fiber.Handler {
 	}
 }
 
-// CreateStartHub - Creates a new starthub
 func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Step 1: Create a variable to hold the incoming data
-		var s models.StartHub
+		// Step 1: Use the proper request struct
+		var req models.CreateStartHubRequest
 
 		// Step 2: Parse the JSON from the request body
-		if err := c.BodyParser(&s); err != nil {
+		if err := c.BodyParser(&req); err != nil {
 			log.Printf("❌ Could not parse request: %v", err)
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Invalid data in request",
@@ -181,44 +180,115 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Step 3: Basic validation
-		if s.Name == "" {
+		if req.Name == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Name is required",
 			})
 		}
-		if s.Email == "" {
+		if req.Email == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Email is required",
 			})
 		}
 
-		// Step 4: Insert into database (only columns that exist!)
+		// Step 4: Start a transaction for multiple table operations
+		tx, err := db.Begin(context.Background())
+		if err != nil {
+			log.Printf("❌ Could not start transaction: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Database transaction error",
+			})
+		}
+		defer tx.Rollback(context.Background()) // Rollback if we don't commit
+
+		// Step 5: Insert the starthub first
+		var s models.StartHub
 		query := `
 		INSERT INTO starthubs (name, description, location, team_size, url, email)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, join_date
 		`
 
-		// Step 5: Execute the query and get the generated ID and join_date back
-		err := db.QueryRow(
+		err = tx.QueryRow(
 			context.Background(),
 			query,
-			s.Name,
-			s.Description,
-			s.Location,
-			s.TeamSize,
-			s.URL,
-			s.Email,
+			req.Name,
+			req.Description,
+			req.Location,
+			req.TeamSize,
+			req.URL,
+			req.Email,
 		).Scan(&s.ID, &s.JoinDate)
 
 		if err != nil {
 			log.Printf("❌ Could not create starthub: %v", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Could not save to database",
+				"error": "Could not save starthub to database",
 			})
 		}
 
-		// Step 6: Return the created starthub
+		// Copy the request data to our response struct
+		s.Name = req.Name
+		s.Description = req.Description
+		s.Location = req.Location
+		s.TeamSize = req.TeamSize
+		s.URL = req.URL
+		s.Email = req.Email
+
+		// Step 6: Handle categories if provided
+		if len(req.Categories) > 0 {
+			for _, categoryName := range req.Categories {
+				if categoryName == "" {
+					continue // Skip empty category names
+				}
+
+				// First, ensure the category exists (insert if not exists)
+				var categoryID int
+				categoryQuery := `
+				INSERT INTO categories (name) 
+				VALUES ($1) 
+				ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+				RETURNING id
+				`
+
+				err = tx.QueryRow(context.Background(), categoryQuery, categoryName).Scan(&categoryID)
+				if err != nil {
+					log.Printf("❌ Could not create/get category '%s': %v", categoryName, err)
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"error": "Could not process categories",
+					})
+				}
+
+				// Then, link the starthub to the category
+				linkQuery := `
+				INSERT INTO starthub_categories (starthub_id, category_id)
+				VALUES ($1, $2)
+				ON CONFLICT (starthub_id, category_id) DO NOTHING
+				`
+
+				_, err = tx.Exec(context.Background(), linkQuery, s.ID, categoryID)
+				if err != nil {
+					log.Printf("❌ Could not link starthub to category: %v", err)
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"error": "Could not link categories",
+					})
+				}
+			}
+
+			// Add categories to response
+			s.Categories = req.Categories
+		}
+
+		// Step 7: Commit the transaction
+		err = tx.Commit(context.Background())
+		if err != nil {
+			log.Printf("❌ Could not commit transaction: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Could not complete starthub creation",
+			})
+		}
+
+		// Step 8: Return the created starthub with categories
 		return c.Status(fiber.StatusCreated).JSON(s)
 	}
 }
