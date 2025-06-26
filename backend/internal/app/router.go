@@ -8,13 +8,13 @@ import (
 )
 
 func setupRoutes(app *fiber.App, db *pgxpool.Pool) {
-
-	//User
+	// User
 	app.Post("/sign-up", middleware.ValidateRegister, routes.RegisterUser(db))
 
-	//Starthubs
+	// Starthubs
 	app.Get("/starthubs", routes.GetAllStarthubs(db))
 	app.Get("/starthubs/search", routes.GetStartHubsBySearchTerm(db))
-	app.Get("/starthubs/:id", routes.GetStartHubByID(db))
+	// This route LAST in its group because matches everything then
+	app.Get("/starthubs/:id", routes.GetStartHubByID(db)) // Keep as last route
 	app.Post("/starthubs", routes.CreateStartHub(db))
 }
