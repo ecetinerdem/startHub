@@ -397,13 +397,16 @@ func UpdateStartHub(db *pgxpool.Pool) fiber.Handler {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 		}
 
-		// Update only if user is owner
+		// Update only if user is owner and return the updated row
 		query := `
 			UPDATE starthubs 
 			SET name=$1, description=$2, location=$3, team_size=$4, url=$5, email=$6 
 			WHERE id=$7 AND created_by=$8
+			RETURNING id, name, description, location, team_size, url, email, join_date, image_url
 		`
-		result, _ := db.Exec(
+
+		var s models.StartHub
+		err := db.QueryRow(
 			context.Background(),
 			query,
 			req.Name,
@@ -414,15 +417,34 @@ func UpdateStartHub(db *pgxpool.Pool) fiber.Handler {
 			req.Email,
 			starthubID,
 			userID,
+		).Scan(
+			&s.ID,
+			&s.Name,
+			&s.Description,
+			&s.Location,
+			&s.TeamSize,
+			&s.URL,
+			&s.Email,
+			&s.JoinDate,
+			&s.ImageURL,
 		)
 
-		if result.RowsAffected() == 0 {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "Starthub not found or you're not the owner",
+		if err != nil {
+			// Handle no rows found (either doesn't exist or user isn't owner)
+			if err.Error() == "no rows in result set" {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "Starthub not found or you're not the owner",
+				})
+			}
+
+			log.Printf("❌ Database error during update: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Could not update starthub",
 			})
 		}
 
-		return c.SendStatus(fiber.StatusOK)
+		// Return the updated starthub
+		return c.JSON(s)
 	}
 }
 
@@ -434,12 +456,19 @@ func DeleteStartHub(db *pgxpool.Pool) fiber.Handler {
 
 		// Delete only if user is owner
 		query := "DELETE FROM starthubs WHERE id=$1 AND created_by=$2"
-		result, _ := db.Exec(
+		result, err := db.Exec(
 			context.Background(),
 			query,
 			starthubID,
 			userID,
 		)
+
+		if err != nil {
+			log.Printf("❌ Database error during delete: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Could not delete starthub",
+			})
+		}
 
 		if result.RowsAffected() == 0 {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
@@ -447,6 +476,9 @@ func DeleteStartHub(db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		return c.SendStatus(fiber.StatusNoContent)
+		// Return simple success message
+		return c.JSON(fiber.Map{
+			"message": "Starthub deleted",
+		})
 	}
 }
