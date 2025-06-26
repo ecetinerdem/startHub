@@ -149,7 +149,6 @@ func GetStartHubByID(db *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		// Updated SQL query to include image_url
 		query := "SELECT id, name, description, location, team_size, url, email, join_date, image_url FROM starthubs WHERE id = $1"
 
 		// Initialize a starthub model to variable
@@ -246,6 +245,8 @@ func GetStartHubsBySearchTerm(db *pgxpool.Pool) fiber.Handler {
 
 func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 	return func(c *fiber.Ctx) error {
+
+		userID := c.Locals("user_id").(string)
 		// Step 1: Use the proper request struct
 		var req models.CreateStartHubRequest
 
@@ -292,8 +293,8 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 		// Step 6: Insert the starthub first (now including image_url)
 		var s models.StartHub
 		query := `
-		INSERT INTO starthubs (name, description, location, team_size, url, email, image_url)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO starthubs (name, description, location, team_size, url, email, image_url, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, join_date
 		`
 
@@ -306,7 +307,8 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 			req.TeamSize,
 			req.URL,
 			req.Email,
-			imageURL, // Added image_url parameter
+			imageURL,
+			userID, // Add created_by
 		).Scan(&s.ID, &s.JoinDate)
 
 		if err != nil {
@@ -380,5 +382,71 @@ func CreateStartHub(db *pgxpool.Pool) fiber.Handler {
 
 		// Step 9: Return the created starthub with categories and image
 		return c.Status(fiber.StatusCreated).JSON(s)
+	}
+}
+
+func UpdateStartHub(db *pgxpool.Pool) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Get starthub ID and user ID
+		starthubID := c.Params("id")
+		userID := c.Locals("user_id").(string)
+
+		// Parse request
+		var req models.CreateStartHubRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
+		}
+
+		// Update only if user is owner
+		query := `
+			UPDATE starthubs 
+			SET name=$1, description=$2, location=$3, team_size=$4, url=$5, email=$6 
+			WHERE id=$7 AND created_by=$8
+		`
+		result, _ := db.Exec(
+			context.Background(),
+			query,
+			req.Name,
+			req.Description,
+			req.Location,
+			req.TeamSize,
+			req.URL,
+			req.Email,
+			starthubID,
+			userID,
+		)
+
+		if result.RowsAffected() == 0 {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Starthub not found or you're not the owner",
+			})
+		}
+
+		return c.SendStatus(fiber.StatusOK)
+	}
+}
+
+func DeleteStartHub(db *pgxpool.Pool) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// Get starthub ID and user ID
+		starthubID := c.Params("id")
+		userID := c.Locals("user_id").(string)
+
+		// Delete only if user is owner
+		query := "DELETE FROM starthubs WHERE id=$1 AND created_by=$2"
+		result, _ := db.Exec(
+			context.Background(),
+			query,
+			starthubID,
+			userID,
+		)
+
+		if result.RowsAffected() == 0 {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Starthub not found or you're not the owner",
+			})
+		}
+
+		return c.SendStatus(fiber.StatusNoContent)
 	}
 }

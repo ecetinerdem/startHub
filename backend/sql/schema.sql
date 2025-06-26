@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
+
 -- Categories table
 CREATE TABLE IF NOT EXISTS categories (
     id SERIAL PRIMARY KEY,
@@ -26,8 +28,11 @@ CREATE TABLE IF NOT EXISTS starthubs (
     url TEXT,
     email TEXT UNIQUE NOT NULL,
     image_url TEXT,
-    join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL  -- Add this line
 );
+
+
 
 -- Many-to-many: Starthub <-> Category
 CREATE TABLE IF NOT EXISTS starthub_categories (

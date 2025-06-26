@@ -15,6 +15,7 @@ type StartHub struct {
 	Categories             []string  `json:"categories,omitempty"`
 	CollaboratingStarthubs []string  `json:"collaborating_starthubs,omitempty"`
 	ExternalCollaborators  []string  `json:"external_collaborators,omitempty"`
+	CreatedBy              string    `json:"-"`
 }
 
 // CreateStartHubRequest represents the request body for creating a starthub
