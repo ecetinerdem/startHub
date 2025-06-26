@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/ecetinerdem/starthub-backend/internal/app"
 	"github.com/ecetinerdem/starthub-backend/internal/database"
@@ -12,5 +13,7 @@ func main() {
 	database.RunMigrations(db)
 	app := app.Init(db)
 
-	log.Fatal(app.Listen(":3000"))
+	PORT := os.Getenv("PORT")
+
+	log.Fatal(app.Listen(":" + PORT))
 }
